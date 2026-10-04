@@ -20,6 +20,7 @@ namespace Friendslop.Features.FactoryPrototype
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
         private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
         private static MaterialPropertyBlock _block;
+        private static Material _defaultMaterial;
         private static Material _ghostMaterial;
         private static Material _lampMaterial;
 
@@ -37,9 +38,8 @@ namespace Friendslop.Features.FactoryPrototype
             AddBox(root.transform, BodyName, center, size, FactoryPalette.Building(def), ghost, !ghost);
 
             // Forward arrow on top of the origin cell.
-            float arrowY = height + 0.02f;
-            AddBox(root.transform, "Arrow", new Vector3(0f, arrowY, 0.2f), new Vector3(0.12f, 0.04f, 0.45f), FactoryPalette.Arrow, ghost, false);
-            AddBox(root.transform, "ArrowTip", new Vector3(0f, arrowY, 0.38f), new Vector3(0.3f, 0.04f, 0.1f), FactoryPalette.Arrow, ghost, false);
+            AddArrow(root.transform, "Forward", new Vector3(0f, height + 0.03f, 0.05f), Quaternion.identity,
+                isBelt ? 1.4f : 1f, FactoryPalette.Arrow, ghost);
 
             for (int i = 0; i < def.Ports.Count; i++)
                 AddPortArrow(root.transform, def.Ports[i], ghost);
@@ -71,14 +71,28 @@ namespace Friendslop.Features.FactoryPrototype
             bool isInput = port.Type == PortType.Input;
             Vector3 direction = isInput ? -side : side;
 
-            var pivot = new GameObject(isInput ? "In" : "Out").transform;
-            pivot.SetParent(root, false);
-            pivot.localPosition = new Vector3(port.Cell.X, 0.16f, port.Cell.Z) + side * 0.62f;
-            pivot.localRotation = Quaternion.LookRotation(direction, Vector3.up);
-
+            Vector3 position = new Vector3(port.Cell.X, 0.16f, port.Cell.Z) + side * 0.62f;
             Color color = isInput ? FactoryPalette.InputPort : FactoryPalette.OutputPort;
-            AddBox(pivot, "Shaft", new Vector3(0f, 0f, -0.05f), new Vector3(0.08f, 0.05f, 0.22f), color, ghost, false);
-            AddBox(pivot, "Head", new Vector3(0f, 0f, 0.09f), new Vector3(0.24f, 0.05f, 0.07f), color, ghost, false);
+            AddArrow(root, isInput ? "In" : "Out", position, Quaternion.LookRotation(direction, Vector3.up), 0.8f, color, ghost);
+        }
+
+        private static void AddArrow(Transform parent, string name, Vector3 localPosition, Quaternion localRotation, float scale, Color color, bool ghost)
+        {
+            var arrow = new GameObject(name);
+            arrow.transform.SetParent(parent, false);
+            arrow.transform.localPosition = localPosition;
+            arrow.transform.localRotation = localRotation;
+            arrow.transform.localScale = Vector3.one * scale;
+            arrow.AddComponent<MeshFilter>().sharedMesh = ArrowMesh.Get();
+
+            var renderer = arrow.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = ghost ? GetGhostMaterial(_defaultMaterial) : _defaultMaterial;
+            if (ghost)
+            {
+                renderer.shadowCastingMode = ShadowCastingMode.Off;
+                color.a = GhostDetailAlpha;
+            }
+            SetColor(renderer, color);
         }
 
         public static void Place(Transform root, Int3 origin, int rotation)
@@ -106,6 +120,8 @@ namespace Friendslop.Features.FactoryPrototype
             box.transform.localScale = localScale;
 
             var renderer = box.GetComponent<Renderer>();
+            // The body box is always created first, so arrows can reuse the pipeline's default material.
+            _defaultMaterial ??= renderer.sharedMaterial;
             if (ghost)
             {
                 renderer.sharedMaterial = GetGhostMaterial(renderer.sharedMaterial);
