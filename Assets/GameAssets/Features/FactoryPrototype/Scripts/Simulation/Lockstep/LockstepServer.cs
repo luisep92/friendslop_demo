@@ -52,6 +52,27 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
             return new ArraySegment<byte>(_batchWriter.Buffer, 0, _batchWriter.Length);
         }
 
+        /// <summary>
+        /// Replaces the state with a save. Queued requests are dropped. Every client must then get a fresh
+        /// snapshot (ticks may go backwards). Returns false and keeps the state on invalid data.
+        /// </summary>
+        public bool TryLoad(byte[] saveData, out string error)
+        {
+            try
+            {
+                SaveFile.Read(Sim, saveData);
+            }
+            catch (FormatException exception)
+            {
+                error = exception.Message;
+                return false;
+            }
+
+            _pending.Clear();
+            error = null;
+            return true;
+        }
+
         /// <summary>Full state at the current tick. Clients apply batches with a greater tick after it.</summary>
         public byte[] CreateSnapshot()
         {

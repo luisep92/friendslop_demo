@@ -7,6 +7,7 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
     {
         private int _timer;
         private bool _hasPending;
+        private int _produced;
 
         internal SourceBuilding(FactorySim sim, int id, BuildingDef def, Int3 origin, int rotation)
             : base(sim, id, def, origin, rotation)
@@ -15,6 +16,9 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
 
         /// <summary>True when an item is ready but the output did not accept it.</summary>
         public bool IsBlocked => _hasPending;
+
+        public override BuildingStatus Status => _hasPending ? BuildingStatus.Blocked : BuildingStatus.Working;
+        public override int Throughput => _produced;
 
         internal override void Step(int tick)
         {
@@ -28,7 +32,10 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
             {
                 WorldPort output = Ports[0];
                 if (TryPush(output, new Item(0, Def.SourceItem), tick))
+                {
                     _hasPending = false;
+                    _produced++;
+                }
             }
         }
 
@@ -38,12 +45,14 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
         {
             writer.WriteInt(_timer);
             writer.WriteBool(_hasPending);
+            writer.WriteInt(_produced);
         }
 
         internal override void ReadState(SimReader reader)
         {
             _timer = reader.ReadInt();
             _hasPending = reader.ReadBool();
+            _produced = reader.ReadInt();
         }
 
         public override string Describe() =>

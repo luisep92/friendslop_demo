@@ -3,13 +3,25 @@ using System.Collections.Generic;
 
 namespace Friendslop.Features.FactoryPrototype.Simulation
 {
+    public enum PlacementResult : byte
+    {
+        Ok,
+        UnknownBuilding,
+
+        /// <summary>Only level 0 is buildable for now.</summary>
+        WrongLevel,
+        OutOfBounds,
+        Occupied
+    }
+
     /// <summary>
     /// Deterministic factory simulation. Integer state only, buildings stepped in creation order,
     /// mutated only through SimCommands. Same content + same commands at the same ticks = same state.
     /// </summary>
     public sealed class FactorySim
     {
-        private const byte SnapshotVersion = 1;
+        // 2: production counters for sources and crafters.
+        private const byte SnapshotVersion = 2;
 
         // One building per cell at most.
         private const int MaxBuildings = (SimConstants.GridMax - SimConstants.GridMin + 1) * (SimConstants.GridMax - SimConstants.GridMin + 1);
@@ -58,19 +70,27 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
 
         public Building GetBuilding(int id) => _byId.TryGetValue(id, out Building building) ? building : null;
 
-        public bool CanPlace(ushort defId, Int3 origin, int rotation)
+        public bool CanPlace(ushort defId, Int3 origin, int rotation) =>
+            CheckPlacement(defId, origin, rotation) == PlacementResult.Ok;
+
+        /// <summary>Why a placement is (in)valid. First failing cell wins.</summary>
+        public PlacementResult CheckPlacement(ushort defId, Int3 origin, int rotation)
         {
             BuildingDef def = Content.GetBuilding(defId);
             if (def == null)
-                return false;
+                return PlacementResult.UnknownBuilding;
 
             Footprint.GetCells(def, origin, rotation, _cellBuffer);
             foreach (Int3 cell in _cellBuffer)
             {
-                if (!IsInBounds(cell) || _cells.ContainsKey(cell))
-                    return false;
+                if (cell.Y != 0)
+                    return PlacementResult.WrongLevel;
+                if (!IsInBounds(cell))
+                    return PlacementResult.OutOfBounds;
+                if (_cells.ContainsKey(cell))
+                    return PlacementResult.Occupied;
             }
-            return true;
+            return PlacementResult.Ok;
         }
 
         /// <summary>Applies a command immediately. Returns false if it is invalid for the current state.</summary>

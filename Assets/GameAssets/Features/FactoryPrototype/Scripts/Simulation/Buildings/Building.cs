@@ -17,6 +17,19 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
         public ushort Type { get; }
     }
 
+    /// <summary>Coarse state for status lights.</summary>
+    public enum BuildingStatus : byte
+    {
+        None,
+        Working,
+
+        /// <summary>Waiting for inputs.</summary>
+        Waiting,
+
+        /// <summary>Output cannot leave.</summary>
+        Blocked
+    }
+
     /// <summary>
     /// Placed building. Origin, rotation and ports never change after placement.
     /// Step order = creation order. Mutated only by the owning FactorySim.
@@ -46,6 +59,11 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
         public IReadOnlyList<WorldPort> Ports => _ports;
 
         protected FactorySim Sim { get; }
+
+        public virtual BuildingStatus Status => BuildingStatus.None;
+
+        /// <summary>Items produced, crafted or sold since placement. Used for measured rates. 0 if not applicable.</summary>
+        public virtual int Throughput => 0;
 
         internal abstract void Step(int tick);
 

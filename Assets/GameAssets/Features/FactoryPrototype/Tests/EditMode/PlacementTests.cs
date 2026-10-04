@@ -30,6 +30,19 @@ namespace Friendslop.Features.FactoryPrototype.Tests
         }
 
         [Test]
+        public void CheckPlacement_ReportsReason()
+        {
+            FactorySim sim = NewSim();
+            Place(sim, PrototypeContent.Belt, 0, 0);
+
+            Assert.AreEqual(PlacementResult.Ok, sim.CheckPlacement(PrototypeContent.Belt, new Int3(1, 0, 0), 0));
+            Assert.AreEqual(PlacementResult.Occupied, sim.CheckPlacement(PrototypeContent.Mixer, new Int3(-1, 0, 0), 0));
+            Assert.AreEqual(PlacementResult.OutOfBounds, sim.CheckPlacement(PrototypeContent.Belt, new Int3(SimConstants.GridMax + 1, 0, 0), 0));
+            Assert.AreEqual(PlacementResult.WrongLevel, sim.CheckPlacement(PrototypeContent.Belt, new Int3(3, 1, 3), 0));
+            Assert.AreEqual(PlacementResult.UnknownBuilding, sim.CheckPlacement(99, Int3.Zero, 0));
+        }
+
+        [Test]
         public void Remove_ByAnyCell_FreesAllCells()
         {
             FactorySim sim = NewSim();

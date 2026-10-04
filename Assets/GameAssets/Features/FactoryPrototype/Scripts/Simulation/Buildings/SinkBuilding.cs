@@ -14,6 +14,9 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
 
         public int Delivered => _delivered;
 
+        public override BuildingStatus Status => BuildingStatus.Working;
+        public override int Throughput => _delivered;
+
         internal override void Step(int tick)
         {
         }

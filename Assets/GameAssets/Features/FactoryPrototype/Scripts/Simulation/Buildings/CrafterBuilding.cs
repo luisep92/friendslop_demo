@@ -22,6 +22,7 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
         private readonly int[] _outputs;
         private bool _crafting;
         private int _progress;
+        private int _crafted;
 
         internal CrafterBuilding(FactorySim sim, int id, BuildingDef def, Int3 origin, int rotation)
             : base(sim, id, def, origin, rotation)
@@ -43,6 +44,22 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
             }
         }
 
+        public override BuildingStatus Status
+        {
+            get
+            {
+                switch (State)
+                {
+                    case CrafterState.Crafting: return BuildingStatus.Working;
+                    case CrafterState.OutputBlocked: return BuildingStatus.Blocked;
+                    default: return BuildingStatus.Waiting;
+                }
+            }
+        }
+
+        /// <summary>Completed crafts.</summary>
+        public override int Throughput => _crafted;
+
         public int GetInputCount(int index) => _inputs[index];
         public int GetOutputCount(int index) => _outputs[index];
 
@@ -62,6 +79,7 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
                         _outputs[i] += recipe.Outputs[i].Count;
                     _crafting = false;
                     _progress = 0;
+                    _crafted++;
                 }
             }
 
@@ -91,6 +109,7 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
         {
             writer.WriteBool(_crafting);
             writer.WriteInt(_progress);
+            writer.WriteInt(_crafted);
             for (int i = 0; i < _inputs.Length; i++)
                 writer.WriteInt(_inputs[i]);
             for (int i = 0; i < _outputs.Length; i++)
@@ -101,6 +120,7 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
         {
             _crafting = reader.ReadBool();
             _progress = reader.ReadInt();
+            _crafted = reader.ReadInt();
             for (int i = 0; i < _inputs.Length; i++)
                 _inputs[i] = reader.ReadInt();
             for (int i = 0; i < _outputs.Length; i++)
