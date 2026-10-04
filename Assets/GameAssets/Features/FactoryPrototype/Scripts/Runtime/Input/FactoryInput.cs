@@ -30,7 +30,7 @@ namespace Friendslop.Features.FactoryPrototype
         /// <summary>Place / confirm. Dismantle: click marks, hold dismantles.</summary>
         public InputAction Primary { get; }
 
-        /// <summary>Cancel the current belt run. Dismantle: clear the selection.</summary>
+        /// <summary>Step back: cancel the belt run / clear dismantle marks, else leave the current mode.</summary>
         public InputAction Secondary { get; }
 
         /// <summary>Dismantle: held, adds whatever is aimed at to the selection.</summary>

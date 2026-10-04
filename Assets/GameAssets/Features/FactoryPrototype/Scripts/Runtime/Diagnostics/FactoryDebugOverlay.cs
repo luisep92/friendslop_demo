@@ -108,6 +108,10 @@ namespace Friendslop.Features.FactoryPrototype
                     string progress = tool.DismantleProgress > 0f ? $"   dismantling {tool.DismantleProgress:P0}" : string.Empty;
                     text.AppendLine($"<b>Mode</b> <color=red>DISMANTLE</color>   marked {tool.SelectionCount}{progress}");
                 }
+                else if (tool.Mode == BuildMode.None)
+                {
+                    text.AppendLine("<b>Mode</b> none");
+                }
                 else
                     text.AppendLine($"<b>Mode</b> build [{tool.SelectedSlot + 1}] {tool.SelectedDef.Name}   rot {tool.Rotation} ({Footprint.Forward(tool.Rotation)})");
 
@@ -122,8 +126,8 @@ namespace Friendslop.Features.FactoryPrototype
             }
 
             text.AppendLine();
-            text.AppendLine("1-6 select   LMB place (belts: start, end)   RMB cancel   R rotate / flip corner / turn end");
-            text.AppendLine("F dismantle: click mark, Ctrl sweep, hold LMB dismantle, RMB clear   MMB sample   E inspect   Tab cursor");
+            text.AppendLine("1-6 build   LMB place (belts: start, end)   R rotate / flip corner / turn end   RMB back / exit mode");
+            text.AppendLine("F dismantle: click mark, Ctrl sweep, hold LMB dismantle   MMB sample   E inspect   Tab cursor");
             text.Append("Server: F5 demo line, F6 save, F7 load   Client: F8 corrupt, F9 join, F10 leave");
             return text.ToString();
         }

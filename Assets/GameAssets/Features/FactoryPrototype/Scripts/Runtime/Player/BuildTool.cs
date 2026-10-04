@@ -7,6 +7,8 @@ namespace Friendslop.Features.FactoryPrototype
 {
     public enum BuildMode
     {
+        /// <summary>Hands free: no preview, LMB does nothing.</summary>
+        None,
         Build,
         Dismantle
     }
@@ -14,12 +16,14 @@ namespace Friendslop.Features.FactoryPrototype
     /// <summary>
     /// Owner-only build gun. Raycasts from the screen center: the place target is the cell in front of the
     /// hit face, the remove target is the cell behind it.
+    /// - Mode None by default. 1-6 enter Build, F toggles Dismantle, MMB samples into Build.
+    ///   RMB steps back: cancels a belt run / clears dismantle marks first, then exits to None.
     /// - Build: LMB places. Belts use two clicks (start, end) with an L-shaped path that snaps to ports.
-    ///   R flips the corner, or rotates the last tile of a straight / single-tile run. RMB cancels.
+    ///   R flips the corner, or rotates the last tile of a straight / single-tile run.
     ///   Other buildings: R rotates.
-    /// - Dismantle (F), Satisfactory style: click marks/unmarks, Ctrl sweeps the aim to mark,
-    ///   hold LMB to dismantle the marked buildings (or the aimed one), RMB clears the marks.
-    /// - MMB samples type and rotation of the aimed building. E opens / closes its inspector.
+    /// - Dismantle, Satisfactory style: click marks/unmarks, Ctrl sweeps the aim to mark,
+    ///   hold LMB to dismantle the marked buildings (or the aimed one).
+    /// - E opens / closes the inspector of the aimed building, in any mode.
     /// Requests go through FactoryNetwork; the server validates them with the same Footprint rules.
     /// </summary>
     [RequireComponent(typeof(FirstPersonController))]
@@ -138,26 +142,35 @@ namespace Friendslop.Features.FactoryPrototype
             UpdateInspector(sim);
             PlacementMessage = null;
 
-            int ghostCount;
+            int ghostCount = 0;
             if (Mode == BuildMode.Dismantle)
                 ghostCount = UpdateDismantle(network, sim);
-            else if (SelectedDef.Kind == BuildingKind.Belt)
-                ghostCount = UpdateBeltTool(network, sim);
-            else
-                ghostCount = UpdateSingleTool(network, sim);
+            else if (Mode == BuildMode.Build)
+                ghostCount = SelectedDef.Kind == BuildingKind.Belt ? UpdateBeltTool(network, sim) : UpdateSingleTool(network, sim);
             _ghosts.HideFrom(ghostCount);
         }
 
         private void HandleModeKeys()
         {
             if (_input.Dismantle.WasPressedThisFrame())
-                SetMode(Mode == BuildMode.Build ? BuildMode.Dismantle : BuildMode.Build);
+                SetMode(Mode == BuildMode.Dismantle ? BuildMode.None : BuildMode.Dismantle);
 
             int slot = _input.PressedSlot();
             if (slot >= 0 && slot < _content.Buildable.Count)
             {
                 SelectedSlot = slot;
                 SetMode(BuildMode.Build);
+            }
+
+            // RMB steps back one level: pending work first, then the mode itself.
+            if (_input.Secondary.WasPressedThisFrame())
+            {
+                if (Mode == BuildMode.Build && _runActive)
+                    CancelRun();
+                else if (Mode == BuildMode.Dismantle && _selection.Count > 0)
+                    _selection.Clear();
+                else
+                    SetMode(BuildMode.None);
             }
         }
 
@@ -239,9 +252,6 @@ namespace Friendslop.Features.FactoryPrototype
                 if (sim.GetBuilding(_selection[i]) == null)
                     _selection.RemoveAt(i);
             }
-
-            if (_input.Secondary.WasPressedThisFrame())
-                _selection.Clear();
 
             bool sweeping = _input.Modifier.IsPressed();
             if (sweeping && TargetBuilding != null && !_selection.Contains(TargetBuilding.Id) && _selection.Count < MaxSelection)
@@ -337,9 +347,6 @@ namespace Friendslop.Features.FactoryPrototype
         private int UpdateBeltTool(FactoryNetwork network, FactorySim sim)
         {
             BuildingDef belt = SelectedDef;
-            if (_input.Secondary.WasPressedThisFrame())
-                CancelRun();
-
             if (!_runActive)
             {
                 if (_input.Rotate.WasPressedThisFrame())
