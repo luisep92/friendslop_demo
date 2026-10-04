@@ -1,3 +1,4 @@
+using FishNet.Connection;
 using FishNet.Object;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -77,6 +78,16 @@ namespace Friendslop.Features.FactoryPrototype
             if (_overviewCamera != null)
                 _overviewCamera.gameObject.SetActive(true);
             SetCursorLocked(false);
+        }
+
+        /// <summary>Server asks the owner to move: position is client-authoritative (save load).</summary>
+        [TargetRpc]
+        public void TargetTeleport(NetworkConnection connection, Vector3 position, float yaw)
+        {
+            _controller.enabled = false;
+            transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f));
+            _controller.enabled = true;
+            _verticalVelocity = 0f;
         }
 
         public static void SetCursorLocked(bool locked)

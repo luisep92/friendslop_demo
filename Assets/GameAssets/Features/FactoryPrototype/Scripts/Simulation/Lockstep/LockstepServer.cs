@@ -55,15 +55,17 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
         /// <summary>
         /// Replaces the state with a save. Queued requests are dropped. Every client must then get a fresh
         /// snapshot (ticks may go backwards). Returns false and keeps the state on invalid data.
+        /// extra = the save's extra section (data outside the sim).
         /// </summary>
-        public bool TryLoad(byte[] saveData, out string error)
+        public bool TryLoad(byte[] saveData, out byte[] extra, out string error)
         {
             try
             {
-                SaveFile.Read(Sim, saveData);
+                extra = SaveFile.Read(Sim, saveData);
             }
             catch (FormatException exception)
             {
+                extra = null;
                 error = exception.Message;
                 return false;
             }

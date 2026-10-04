@@ -70,6 +70,33 @@ namespace Friendslop.Features.FactoryPrototype.Tests
         }
 
         [Test]
+        public void SaveFile_ExtraSection_RoundTrips()
+        {
+            FactorySim sim = NewSim();
+            Apply(sim, DemoLayouts.MinimalLine(Int3.Zero, 0));
+            var extra = new byte[] { 7, 0, 255, 42 };
+
+            byte[] save = SaveFile.Write(sim, extra);
+            CollectionAssert.AreEqual(extra, SaveFile.Read(NewSim(), save));
+            CollectionAssert.IsEmpty(SaveFile.Read(NewSim(), SaveFile.Write(sim)));
+        }
+
+        [Test]
+        public void SaveFile_InvalidExtraLength_KeepsState()
+        {
+            FactorySim sim = NewSim();
+            Apply(sim, DemoLayouts.MinimalLine(Int3.Zero, 0));
+            uint before = sim.ComputeChecksum();
+
+            byte[] save = SaveFile.Write(NewSim(), new byte[] { 1, 2, 3 });
+            save[5] = 0xFF; // Extra length low byte: now larger than the file.
+            save[6] = 0xFF;
+            Assert.Throws<FormatException>(() => SaveFile.Read(sim, save));
+
+            Assert.AreEqual(before, sim.ComputeChecksum());
+        }
+
+        [Test]
         public void SaveFile_RejectsForeignData_AndKeepsState()
         {
             FactorySim sim = NewSim();
@@ -101,7 +128,7 @@ namespace Friendslop.Features.FactoryPrototype.Tests
             client.OnSnapshot(join, 0, join.Length);
             Pump(server, client, 50);
 
-            Assert.IsTrue(server.TryLoad(save, out string error), error);
+            Assert.IsTrue(server.TryLoad(save, out _, out string error), error);
             Assert.AreEqual(200, server.Sim.Tick, "Ticks go back to the saved tick.");
             byte[] resync = server.CreateSnapshot();
             Assert.IsTrue(client.OnSnapshot(resync, 0, resync.Length));
@@ -122,7 +149,7 @@ namespace Friendslop.Features.FactoryPrototype.Tests
             server.Step();
             uint before = server.Sim.ComputeChecksum();
 
-            Assert.IsFalse(server.TryLoad(new byte[] { 0, 0 }, out string error));
+            Assert.IsFalse(server.TryLoad(new byte[] { 0, 0 }, out _, out string error));
             Assert.IsNotEmpty(error);
             Assert.AreEqual(before, server.Sim.ComputeChecksum());
         }

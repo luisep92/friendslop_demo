@@ -131,8 +131,9 @@ namespace Friendslop.Features.FactoryPrototype
 
             try
             {
-                File.WriteAllBytes(SavePath, SaveFile.Write(_server.Sim));
-                Report($"Saved tick {_server.Sim.Tick} to {SavePath}", false);
+                byte[] players = WritePlayers(out int playerCount);
+                File.WriteAllBytes(SavePath, SaveFile.Write(_server.Sim, players));
+                Report($"Saved tick {_server.Sim.Tick} and {playerCount} players to {SavePath}", false);
             }
             catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
             {
@@ -157,7 +158,7 @@ namespace Friendslop.Features.FactoryPrototype
                 return;
             }
 
-            if (!_server.TryLoad(data, out string error))
+            if (!_server.TryLoad(data, out byte[] extra, out string error))
             {
                 Report($"Load failed: {error}", true);
                 return;
@@ -169,7 +170,84 @@ namespace Friendslop.Features.FactoryPrototype
                 if (!connection.IsLocalClient)
                     SendSnapshot(connection);
             }
-            Report($"Loaded tick {_server.Sim.Tick}", false);
+
+            int moved = RestorePlayers(extra);
+            Report($"Loaded tick {_server.Sim.Tick}, moved {moved} players", false);
+        }
+
+        /// <summary>
+        /// Player poses, keyed by FishNet ClientId. Not stable across sessions (host 0, then join order):
+        /// good enough for the prototype; key by Steam ID later.
+        /// </summary>
+        private byte[] WritePlayers(out int count)
+        {
+            var players = new List<(int Key, Transform Transform)>();
+            foreach (NetworkConnection connection in ServerManager.Clients.Values)
+            {
+                FirstPersonController player = GetPlayer(connection);
+                if (player != null)
+                    players.Add((connection.ClientId, player.transform));
+            }
+
+            var writer = new SimWriter();
+            writer.WriteInt(players.Count);
+            foreach ((int key, Transform player) in players)
+            {
+                Vector3 position = player.position;
+                writer.WriteInt(key);
+                writer.WriteInt(BitConverter.SingleToInt32Bits(position.x));
+                writer.WriteInt(BitConverter.SingleToInt32Bits(position.y));
+                writer.WriteInt(BitConverter.SingleToInt32Bits(position.z));
+                writer.WriteInt(BitConverter.SingleToInt32Bits(player.eulerAngles.y));
+            }
+
+            count = players.Count;
+            return writer.ToArray();
+        }
+
+        /// <summary>Teleports connected players found in the save. Their owners move them (client-authoritative).</summary>
+        private int RestorePlayers(byte[] extra)
+        {
+            if (extra == null || extra.Length == 0)
+                return 0;
+
+            var poses = new Dictionary<int, (Vector3 Position, float Yaw)>();
+            try
+            {
+                var reader = new SimReader(extra);
+                int count = reader.ReadInt();
+                for (int i = 0; i < count; i++)
+                {
+                    int key = reader.ReadInt();
+                    var position = new Vector3(ReadFloat(reader), ReadFloat(reader), ReadFloat(reader));
+                    poses[key] = (position, ReadFloat(reader));
+                }
+            }
+            catch (FormatException exception)
+            {
+                Debug.LogWarning($"[FactoryNetwork] Ignoring invalid player data in save: {exception.Message}");
+                return 0;
+            }
+
+            int moved = 0;
+            foreach (NetworkConnection connection in ServerManager.Clients.Values)
+            {
+                FirstPersonController player = GetPlayer(connection);
+                if (player == null || !poses.TryGetValue(connection.ClientId, out (Vector3 Position, float Yaw) pose))
+                    continue;
+
+                player.TargetTeleport(connection, pose.Position, pose.Yaw);
+                moved++;
+            }
+            return moved;
+        }
+
+        private static float ReadFloat(SimReader reader) => BitConverter.Int32BitsToSingle(reader.ReadInt());
+
+        private static FirstPersonController GetPlayer(NetworkConnection connection)
+        {
+            NetworkObject first = connection.FirstObject;
+            return first != null ? first.GetComponent<FirstPersonController>() : null;
         }
 
         /// <summary>Client only. Breaks the replica to exercise mismatch detection and resync.</summary>
