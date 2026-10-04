@@ -34,6 +34,21 @@ Assets/GameAssets/
   Scenes/
 ```
 
+## Factory prototype (`Features/FactoryPrototype/`)
+- Co-op automation prototype. Scene: `Scenes/FactoryPrototype.unity`.
+- Netcode: server-driven deterministic lockstep. Only build commands and tick numbers go over the network, never belt items.
+  - Server steps the canonical sim at 20 Hz and broadcasts `{tick, applied commands, checksum every 20 ticks}`.
+  - Clients start from a snapshot (`OnSpawnServer`), replay batches with a small buffer, and resync on checksum mismatch or tick gap.
+  - `FactoryNetwork` only forwards bytes. Lockstep logic lives in the simulation assembly and is tested without FishNet.
+- Simulation assembly (`Scripts/Simulation`, `noEngineReferences`) must stay deterministic:
+  - Integer state only. No float, no `Time`, no `System.HashCode`, no static mutable state.
+  - Never iterate `Dictionary`/`HashSet` for logic. Update order = building creation order.
+  - All state changes go through `SimCommand`. Views read the sim, never write it.
+  - New state must be added to `WriteSnapshot`/`ReadSnapshot`, or checksums and late join break.
+- Tests: EditMode, assembly `Friendslop.Features.FactoryPrototype.Tests`. Run them after any sim change.
+- Scene `NetworkObject`s need a non-zero SceneId. Objects added by script may get 0 and then never spawn, without error: verify after saving.
+- Debug keys: F5 demo line (server), F8 corrupt replica (client), F9 join as client, F10 leave.
+
 ## Unity workflow
 - Edit scenes, prefabs and assets via UnityMCP. Never hand-edit `.unity`/`.prefab`/`.asset` YAML.
 - Check the Unity console after script changes.
