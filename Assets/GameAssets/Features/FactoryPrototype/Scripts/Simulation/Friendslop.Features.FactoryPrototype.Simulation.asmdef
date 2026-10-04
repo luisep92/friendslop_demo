@@ -1,0 +1,14 @@
+{
+    "name": "Friendslop.Features.FactoryPrototype.Simulation",
+    "rootNamespace": "Friendslop.Features.FactoryPrototype.Simulation",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}
