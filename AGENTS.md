@@ -7,7 +7,15 @@ This project aims to collect some experience in the friendslop game development 
 
 ## Stack
 - Unity 6000.3.25f1, URP.
-- Networking: FishNet (not installed yet).
+- Networking: FishNet 4.7.3, installed via UPM git URL pinned to tag (`Packages/manifest.json`). Upgrade by changing the tag.
+  - Config: `Assets/FishNet.Config.XML` (path hardcoded by FishNet, only allowed file outside `GameAssets/`).
+  - Prefab generator scans `Assets/GameAssets` only. Output: `Core/Network/DefaultPrefabObjects.asset`.
+  - Transports live in a Multipass (`GlobalServerActions` off). `Core/Network/NetworkBootstrap` picks one transport and the role at start. Game code must not depend on a specific transport.
+  - Transport: `-transport=tugboat|steam` arg > editor (always Tugboat) > `NetworkConfig.DefaultTransport`.
+  - Role: `-netrole=host|server|client|none` arg > editor (MPPM tag `Host`/`Server`/`Client`, else main editor = Host, virtual player = Client) > `NetworkConfig.DefaultBuildRole`.
+  - Extra args: `-address`, `-port`.
+- Local multiplayer testing: Multiplayer Play Mode (built into Unity 6.3, API `Unity.Multiplayer.PlayMode.CurrentPlayer`).
+- Entry scene: `Scenes/Bootstrap.unity`.
 - Input: new Input System only (`activeInputHandler` = Input System). Legacy `Input.GetKey*` API is not available. Read input only on the owning client.
 
 ## Structure
