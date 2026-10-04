@@ -42,6 +42,24 @@ namespace Friendslop.Features.FactoryPrototype.Tests
         }
 
         [Test]
+        public void GetBuilding_ById_TracksAddRemoveAndSnapshot()
+        {
+            FactorySim sim = NewSim();
+            Place(sim, PrototypeContent.Mixer, 0, 0);
+            int id = sim.GetBuildingAt(Int3.Zero).Id;
+            Assert.AreSame(sim.GetBuildingAt(Int3.Zero), sim.GetBuilding(id));
+
+            var writer = new SimWriter();
+            sim.WriteSnapshot(writer);
+            FactorySim copy = NewSim();
+            copy.ReadSnapshot(new SimReader(writer.ToArray()));
+            Assert.AreEqual(PrototypeContent.Mixer, copy.GetBuilding(id).Def.Id);
+
+            sim.TryApply(SimCommand.Remove(Int3.Zero));
+            Assert.IsNull(sim.GetBuilding(id));
+        }
+
+        [Test]
         public void Ids_AreMonotonicAfterRemoval()
         {
             FactorySim sim = NewSim();

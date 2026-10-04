@@ -16,8 +16,9 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
 
         private readonly List<Building> _buildings = new List<Building>();
 
-        // Lookup only. Never iterated: iteration order is not deterministic.
+        // Lookups only. Never iterated: iteration order is not deterministic.
         private readonly Dictionary<Int3, Building> _cells = new Dictionary<Int3, Building>();
+        private readonly Dictionary<int, Building> _byId = new Dictionary<int, Building>();
 
         private readonly List<Int3> _cellBuffer = new List<Int3>();
         private SimWriter _checksumWriter;
@@ -54,6 +55,8 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
             && cell.Z >= SimConstants.GridMin && cell.Z <= SimConstants.GridMax;
 
         public Building GetBuildingAt(Int3 cell) => _cells.TryGetValue(cell, out Building building) ? building : null;
+
+        public Building GetBuilding(int id) => _byId.TryGetValue(id, out Building building) ? building : null;
 
         public bool CanPlace(ushort defId, Int3 origin, int rotation)
         {
@@ -181,6 +184,7 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
 
             _buildings.Clear();
             _cells.Clear();
+            _byId.Clear();
             foreach (Building building in loaded)
                 Register(building);
 
@@ -220,6 +224,7 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
         private void Register(Building building)
         {
             _buildings.Add(building);
+            _byId[building.Id] = building;
             Footprint.GetCells(building.Def, building.Origin, building.Rotation, _cellBuffer);
             foreach (Int3 cell in _cellBuffer)
                 _cells[cell] = building;
@@ -228,6 +233,7 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
         private void Unregister(Building building)
         {
             _buildings.Remove(building);
+            _byId.Remove(building.Id);
             Footprint.GetCells(building.Def, building.Origin, building.Rotation, _cellBuffer);
             foreach (Int3 cell in _cellBuffer)
                 _cells.Remove(cell);
