@@ -14,9 +14,11 @@ namespace Friendslop.Features.FactoryPrototype
     /// <summary>
     /// Owner-only build gun. Raycasts from the screen center: the place target is the cell in front of the
     /// hit face, the remove target is the cell behind it.
-    /// - Build: LMB places. Belts use two clicks (start, end) with an L-shaped path that snaps to ports;
-    ///   R flips the corner, RMB cancels. Other buildings: R rotates.
-    /// - Dismantle (F): hold LMB to remove everything aimed at.
+    /// - Build: LMB places. Belts use two clicks (start, end) with an L-shaped path that snaps to ports.
+    ///   R flips the corner, or rotates the last tile of a straight / single-tile run. RMB cancels.
+    ///   Other buildings: R rotates.
+    /// - Dismantle (F), Satisfactory style: click marks/unmarks, Ctrl sweeps the aim to mark,
+    ///   hold LMB to dismantle the marked buildings (or the aimed one), RMB clears the marks.
     /// - MMB samples type and rotation of the aimed building.
     /// Requests go through FactoryNetwork; the server validates them with the same Footprint rules.
     /// </summary>
@@ -25,11 +27,17 @@ namespace Friendslop.Features.FactoryPrototype
     {
         private const float SurfaceEpsilon = 0.01f;
         private const int MaxBeltRun = 64;
+        private const int MaxSelection = 100;
+        private const float HoldToDismantleSeconds = 0.5f;
+        private const float ClickMaxSeconds = 0.25f;
 
         [SerializeField] private float _reach = 12f;
 
         private readonly List<BeltTile> _beltPlan = new List<BeltTile>();
-        private readonly HashSet<int> _dismantleRequested = new HashSet<int>();
+        private readonly List<int> _selection = new List<int>();
+        private float _holdStart = -1f;
+        private Dir? _endOverride;
+        private Int3 _endOverrideCell;
         private FactoryInput _input;
         private GhostSet _ghosts;
         private PendingPlacements _pending;
@@ -56,6 +64,12 @@ namespace Friendslop.Features.FactoryPrototype
         public int BeltRunLength => _runActive ? _beltPlan.Count : 0;
         public bool BeltRunValid { get; private set; }
         public int PendingCount => _pending?.Count ?? 0;
+
+        /// <summary>Buildings marked for dismantling.</summary>
+        public int SelectionCount => _selection.Count;
+
+        /// <summary>0-1 while LMB is held in dismantle mode.</summary>
+        public float DismantleProgress { get; private set; }
 
         public override void OnStartClient()
         {
@@ -118,7 +132,7 @@ namespace Friendslop.Features.FactoryPrototype
 
             int ghostCount;
             if (Mode == BuildMode.Dismantle)
-                ghostCount = UpdateDismantle(network);
+                ghostCount = UpdateDismantle(network, sim);
             else if (SelectedDef.Kind == BuildingKind.Belt)
                 ghostCount = UpdateBeltTool(network, sim);
             else
@@ -129,18 +143,23 @@ namespace Friendslop.Features.FactoryPrototype
         private void HandleModeKeys()
         {
             if (_input.Dismantle.WasPressedThisFrame())
-            {
-                Mode = Mode == BuildMode.Build ? BuildMode.Dismantle : BuildMode.Build;
-                CancelRun();
-            }
+                SetMode(Mode == BuildMode.Build ? BuildMode.Dismantle : BuildMode.Build);
 
             int slot = _input.PressedSlot();
             if (slot >= 0 && slot < _content.Buildable.Count)
             {
                 SelectedSlot = slot;
-                Mode = BuildMode.Build;
-                CancelRun();
+                SetMode(BuildMode.Build);
             }
+        }
+
+        private void SetMode(BuildMode mode)
+        {
+            Mode = mode;
+            CancelRun();
+            _selection.Clear();
+            _holdStart = -1f;
+            DismantleProgress = 0f;
         }
 
         private void UpdateTarget(FactorySim sim)
@@ -174,23 +193,87 @@ namespace Friendslop.Features.FactoryPrototype
                     SelectedSlot = i;
             }
             Rotation = TargetBuilding.Rotation;
-            Mode = BuildMode.Build;
-            CancelRun();
+            SetMode(BuildMode.Build);
         }
 
-        private int UpdateDismantle(FactoryNetwork network)
+        private int UpdateDismantle(FactoryNetwork network, FactorySim sim)
         {
-            if (!_input.Primary.IsPressed())
-                _dismantleRequested.Clear();
+            // Marked buildings can disappear (removed by anyone, or after a resync).
+            for (int i = _selection.Count - 1; i >= 0; i--)
+            {
+                if (sim.GetBuilding(_selection[i]) == null)
+                    _selection.RemoveAt(i);
+            }
 
-            if (TargetBuilding == null)
-                return 0;
+            if (_input.Secondary.WasPressedThisFrame())
+                _selection.Clear();
 
-            _ghosts.Show(0, TargetBuilding.Def, TargetBuilding.Origin, TargetBuilding.Rotation, FactoryPalette.GhostDismantle);
-            // Holding LMB removes each building once, while the request travels.
-            if (_input.Primary.IsPressed() && _dismantleRequested.Add(TargetBuilding.Id))
-                network.RequestRemove(TargetBuilding.Origin);
-            return 1;
+            bool sweeping = _input.Modifier.IsPressed();
+            if (sweeping && TargetBuilding != null && !_selection.Contains(TargetBuilding.Id) && _selection.Count < MaxSelection)
+                _selection.Add(TargetBuilding.Id);
+
+            UpdateDismantleHold(network, sim, sweeping);
+
+            int count = 0;
+            Color marked = FactoryPalette.GhostDismantle;
+            marked.a = Mathf.Lerp(marked.a, 0.9f, DismantleProgress);
+            foreach (int id in _selection)
+            {
+                Building building = sim.GetBuilding(id);
+                _ghosts.Show(count++, building.Def, building.Origin, building.Rotation, marked);
+            }
+
+            if (TargetBuilding != null && !_selection.Contains(TargetBuilding.Id))
+            {
+                // With nothing marked, a hold dismantles the aimed building: show its progress.
+                Color hover = _selection.Count == 0 && DismantleProgress > 0f ? marked : FactoryPalette.GhostDismantleHover;
+                _ghosts.Show(count++, TargetBuilding.Def, TargetBuilding.Origin, TargetBuilding.Rotation, hover);
+            }
+            return count;
+        }
+
+        /// <summary>Short click toggles the mark on the aimed building. A full hold dismantles.</summary>
+        private void UpdateDismantleHold(FactoryNetwork network, FactorySim sim, bool sweeping)
+        {
+            DismantleProgress = 0f;
+            if (_input.Primary.WasPressedThisFrame())
+                _holdStart = Time.unscaledTime;
+            if (_holdStart < 0f)
+                return;
+
+            float held = Time.unscaledTime - _holdStart;
+            if (_input.Primary.IsPressed())
+            {
+                DismantleProgress = Mathf.Clamp01(held / HoldToDismantleSeconds);
+                if (held < HoldToDismantleSeconds)
+                    return;
+
+                DismantleMarkedOrTarget(network, sim);
+                _holdStart = -1f;
+                DismantleProgress = 0f;
+                return;
+            }
+
+            if (held <= ClickMaxSeconds && !sweeping && TargetBuilding != null)
+            {
+                if (!_selection.Remove(TargetBuilding.Id) && _selection.Count < MaxSelection)
+                    _selection.Add(TargetBuilding.Id);
+            }
+            _holdStart = -1f;
+        }
+
+        private void DismantleMarkedOrTarget(FactoryNetwork network, FactorySim sim)
+        {
+            if (_selection.Count == 0)
+            {
+                if (TargetBuilding != null)
+                    network.RequestRemove(TargetBuilding.Origin);
+                return;
+            }
+
+            foreach (int id in _selection)
+                network.RequestRemove(sim.GetBuilding(id).Origin);
+            _selection.Clear();
         }
 
         private int UpdateSingleTool(FactoryNetwork network, FactorySim sim)
@@ -235,14 +318,29 @@ namespace Friendslop.Features.FactoryPrototype
                 return 1;
             }
 
-            if (_input.Rotate.WasPressedThisFrame())
-                _flipCorner = !_flipCorner;
             if (!_hasTarget)
                 return 0;
 
             var end = new Int3(_placeCell.X, _runStart.Y, _placeCell.Z);
-            Dir? endFlow = BeltPlanner.TryFindConsumer(sim, end, out Dir consumerFlow) ? consumerFlow : (Dir?)null;
-            BeltPlanner.Plan(_runStart, end, _runStartFlow, endFlow, _flipCorner, Rotation, _beltPlan);
+            // The player's choice for the last tile only holds while aiming at the same end cell.
+            if (_endOverride.HasValue && end != _endOverrideCell)
+                _endOverride = null;
+
+            if (_input.Rotate.WasPressedThisFrame())
+            {
+                bool hasCorner = end.X != _runStart.X && end.Z != _runStart.Z;
+                if (hasCorner)
+                {
+                    _flipCorner = !_flipCorner;
+                }
+                else if (_beltPlan.Count > 0)
+                {
+                    _endOverride = ((Dir)_beltPlan[_beltPlan.Count - 1].Rotation).Rotate(1);
+                    _endOverrideCell = end;
+                }
+            }
+
+            BeltPlanner.PlanRun(sim, _runStart, end, _runStartFlow, _endOverride, _flipCorner, Rotation, _beltPlan);
 
             BeltRunValid = _beltPlan.Count <= MaxBeltRun;
             for (int i = 0; i < _beltPlan.Count; i++)
@@ -272,6 +370,7 @@ namespace Friendslop.Features.FactoryPrototype
         {
             _runActive = false;
             BeltRunValid = false;
+            _endOverride = null;
             _beltPlan.Clear();
         }
 

@@ -20,16 +20,20 @@ namespace Friendslop.Features.FactoryPrototype
             Sample = Create("Sample", "<Mouse>/middleButton");
             Rotate = Create("Rotate", "<Keyboard>/r");
             Dismantle = Create("Dismantle", "<Keyboard>/f");
+            Modifier = Create("Modifier", "<Keyboard>/ctrl");
             ToggleCursor = Create("ToggleCursor", "<Keyboard>/tab");
             for (int i = 0; i < SlotCount; i++)
                 _slots[i] = Create($"Slot{i + 1}", $"<Keyboard>/{i + 1}");
         }
 
-        /// <summary>Place / confirm / dismantle (hold).</summary>
+        /// <summary>Place / confirm. Dismantle: click marks, hold dismantles.</summary>
         public InputAction Primary { get; }
 
-        /// <summary>Cancel the current belt run.</summary>
+        /// <summary>Cancel the current belt run. Dismantle: clear the selection.</summary>
         public InputAction Secondary { get; }
+
+        /// <summary>Dismantle: held, adds whatever is aimed at to the selection.</summary>
+        public InputAction Modifier { get; }
 
         /// <summary>Copy type and rotation of the targeted building.</summary>
         public InputAction Sample { get; }
@@ -60,6 +64,7 @@ namespace Friendslop.Features.FactoryPrototype
             Sample.Dispose();
             Rotate.Dispose();
             Dismantle.Dispose();
+            Modifier.Dispose();
             ToggleCursor.Dispose();
             foreach (InputAction slot in _slots)
                 slot.Dispose();

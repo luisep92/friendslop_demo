@@ -71,20 +71,50 @@ namespace Friendslop.Features.FactoryPrototype.Tests
         }
 
         [Test]
-        public void TryFindConsumer_PrefersMachineInputOverBelt()
+        public void TryFindConsumer_AheadFirst_ThenOnlyMachineInput_NeverSideBelts()
         {
             FactorySim sim = NewSim();
             Place(sim, PrototypeContent.Grinder, 0, 2);
-            Place(sim, PrototypeContent.Belt, 1, 1, 1); // East of cell (0, 1), facing east: accepts a straight continuation.
-            Place(sim, PrototypeContent.Belt, 5, 5, 1);
+            Place(sim, PrototypeContent.Belt, 1, 1, 1); // East of cell (0, 1), facing east.
 
-            Assert.IsTrue(BeltPlanner.TryFindConsumer(sim, C(0, 1), out Dir intoMachine));
-            Assert.AreEqual(Dir.North, intoMachine, "Machine input wins over the belt.");
+            Assert.IsTrue(BeltPlanner.TryFindConsumer(sim, C(0, 1), Dir.East, out Dir ahead));
+            Assert.AreEqual(Dir.East, ahead, "What is straight ahead wins.");
 
-            Assert.IsTrue(BeltPlanner.TryFindConsumer(sim, C(4, 5), out Dir intoBelt));
-            Assert.AreEqual(Dir.East, intoBelt);
+            Assert.IsTrue(BeltPlanner.TryFindConsumer(sim, C(0, 1), Dir.West, out Dir machine));
+            Assert.AreEqual(Dir.North, machine, "Nothing ahead: the only machine input.");
 
-            Assert.IsFalse(BeltPlanner.TryFindConsumer(sim, C(1, 2), out _), "Grinder has no port on its east side.");
+            Place(sim, PrototypeContent.Belt, 5, 5, 0); // Parallel line.
+            Assert.IsFalse(BeltPlanner.TryFindConsumer(sim, C(4, 5), Dir.North, out _), "Side belts never snap on their own.");
+            Assert.IsFalse(BeltPlanner.TryFindConsumer(sim, C(1, 2), null, out _), "Grinder has no port on its east side.");
+        }
+
+        [Test]
+        public void PlanRun_GapInLine_ContinuesIntoBeltAheadNotIntoSideLine()
+        {
+            // Line flowing west with a gap at (1, 0). Ahead, (0, 0) turns north (side-load from the east).
+            // Above the gap, (1, 1) faces north and would take items through its back.
+            FactorySim sim = NewSim();
+            Place(sim, PrototypeContent.Belt, 2, 0, 3);
+            Place(sim, PrototypeContent.Belt, 0, 0, 0);
+            Place(sim, PrototypeContent.Belt, 1, 1, 0);
+
+            Assert.IsTrue(BeltPlanner.TryFindFeeder(sim, C(1, 0), out Dir startFlow));
+            BeltPlanner.PlanRun(sim, C(1, 0), C(1, 0), startFlow, null, false, 0, _tiles);
+
+            Assert.AreEqual((int)Dir.West, _tiles.Single().Rotation);
+        }
+
+        [Test]
+        public void PlanRun_EndOverride_Wins()
+        {
+            FactorySim sim = NewSim();
+            Place(sim, PrototypeContent.Grinder, 0, 3);
+
+            BeltPlanner.PlanRun(sim, C(0, 0), C(0, 2), null, null, false, 0, _tiles);
+            Assert.AreEqual((int)Dir.North, _tiles.Last().Rotation, "Snaps into the grinder input.");
+
+            BeltPlanner.PlanRun(sim, C(0, 0), C(0, 2), null, Dir.East, false, 0, _tiles);
+            Assert.AreEqual((int)Dir.East, _tiles.Last().Rotation);
         }
 
         [Test]
@@ -96,8 +126,8 @@ namespace Friendslop.Features.FactoryPrototype.Tests
 
             Assert.IsTrue(BeltPlanner.TryFindFeeder(sim, C(0, 1), out Dir startFlow));
             // End next to the sell point's west side.
-            Assert.IsTrue(BeltPlanner.TryFindConsumer(sim, C(3, 3), out Dir endFlow));
-            BeltPlanner.Plan(C(0, 1), C(3, 3), startFlow, endFlow, false, 0, _tiles);
+            BeltPlanner.PlanRun(sim, C(0, 1), C(3, 3), startFlow, null, false, 0, _tiles);
+            Assert.AreEqual((int)Dir.East, _tiles.Last().Rotation);
             foreach (BeltTile tile in _tiles)
                 Assert.IsTrue(sim.TryApply(SimCommand.Place(PrototypeContent.Belt, tile.Cell, tile.Rotation)), tile.Cell.ToString());
 

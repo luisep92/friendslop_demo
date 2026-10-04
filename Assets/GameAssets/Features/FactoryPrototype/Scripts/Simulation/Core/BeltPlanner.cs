@@ -54,40 +54,53 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
         }
 
         /// <summary>
-        /// Finds an adjacent input that would take items from cell: a machine input port first, then a belt
-        /// continuing straight (entering through its back). flow = direction from cell into it.
+        /// Finds an adjacent building that would take items leaving cell. flow = direction from cell into it.
+        /// Priority: whatever accepts straight ahead (preferred = travel direction), including belts that
+        /// side-load; then the only adjacent machine input. Belts on the sides never snap on their own, so
+        /// parallel lines do not merge by accident.
         /// </summary>
-        public static bool TryFindConsumer(FactorySim sim, Int3 cell, out Dir flow)
+        public static bool TryFindConsumer(FactorySim sim, Int3 cell, Dir? preferred, out Dir flow)
         {
+            int machineInputs = 0;
+            Dir machineFlow = default;
             for (int d = 0; d < 4; d++)
             {
                 var toNeighbor = (Dir)d;
                 Building building = sim.GetBuildingAt(cell + toNeighbor.ToOffset());
-                if (building == null || building is BeltBuilding)
+                if (building == null || !AcceptsFrom(building, cell, toNeighbor))
                     continue;
 
-                foreach (WorldPort port in building.Ports)
-                {
-                    if (port.Type == PortType.Input && port.NeighborCell == cell)
-                    {
-                        flow = toNeighbor;
-                        return true;
-                    }
-                }
-            }
-
-            for (int d = 0; d < 4; d++)
-            {
-                var toNeighbor = (Dir)d;
-                if (sim.GetBuildingAt(cell + toNeighbor.ToOffset()) is BeltBuilding belt && belt.Forward == toNeighbor)
+                if (preferred == toNeighbor)
                 {
                     flow = toNeighbor;
                     return true;
                 }
+
+                if (!(building is BeltBuilding))
+                {
+                    machineInputs++;
+                    machineFlow = toNeighbor;
+                }
             }
 
-            flow = default;
-            return false;
+            flow = machineFlow;
+            return machineInputs == 1;
+        }
+
+        /// <summary>
+        /// Plans a run and orients its last tile: endOverride if set (player choice), else the consumer found
+        /// with TryFindConsumer using the travel direction, else the travel direction.
+        /// </summary>
+        public static void PlanRun(FactorySim sim, Int3 start, Int3 end, Dir? startFlow, Dir? endOverride, bool flipCorner,
+            int defaultRotation, List<BeltTile> result)
+        {
+            Plan(start, end, startFlow, endOverride, flipCorner, defaultRotation, result);
+            if (endOverride.HasValue || result.Count == 0)
+                return;
+
+            var travel = (Dir)result[result.Count - 1].Rotation;
+            if (TryFindConsumer(sim, end, travel, out Dir consumer) && consumer != travel)
+                Plan(start, end, startFlow, consumer, flipCorner, defaultRotation, result);
         }
 
         /// <summary>
@@ -139,6 +152,20 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
 
                 result.Add(new BeltTile { Cell = cells[i], Rotation = rotation });
             }
+        }
+
+        /// <summary>True if building takes items that leave cell moving towards toNeighbor.</summary>
+        private static bool AcceptsFrom(Building building, Int3 cell, Dir toNeighbor)
+        {
+            if (building is BeltBuilding belt)
+                return belt.AcceptsFrom(toNeighbor.Opposite());
+
+            foreach (WorldPort port in building.Ports)
+            {
+                if (port.Type == PortType.Input && port.NeighborCell == cell)
+                    return true;
+            }
+            return false;
         }
 
         private static Int3 Walk(List<Int3> cells, Int3 from, int dx, int dz)
