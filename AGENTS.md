@@ -47,7 +47,9 @@ Assets/GameAssets/
   - New state must be added to `WriteSnapshot`/`ReadSnapshot`, or checksums and late join break.
 - Tests: EditMode, assembly `Friendslop.Features.FactoryPrototype.Tests`. Run them after any sim change.
 - Scene `NetworkObject`s need a non-zero SceneId. Objects added by script may get 0 and then never spawn, without error: verify after saving.
-- Debug keys: F5 demo line (server), F8 corrupt replica (client), F9 join as client, F10 leave.
+- Debug keys: F5 demo line, F6 save, F7 load (server); F8 corrupt replica, F9 join as client, F10 leave (client).
+- Saves: `SaveFile` (header + snapshot) at `Application.persistentDataPath/factory_prototype.sav`. After a load, every client gets a fresh snapshot.
+- MPPM virtual players also show up as UnityMCP instances: switch with `set_active_instance` to inspect the client replica.
 
 ## Unity workflow
 - Edit scenes, prefabs and assets via UnityMCP. Never hand-edit `.unity`/`.prefab`/`.asset` YAML.
