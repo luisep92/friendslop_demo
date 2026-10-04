@@ -18,6 +18,7 @@ namespace Friendslop.Features.FactoryPrototype
         private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
         private readonly Dictionary<int, GameObject> _buildingViews = new Dictionary<int, GameObject>();
+        private readonly Dictionary<int, Lamp> _lamps = new Dictionary<int, Lamp>();
         private readonly Dictionary<ushort, ItemBatch> _batches = new Dictionary<ushort, ItemBatch>();
         private Dictionary<int, Vector3> _previous = new Dictionary<int, Vector3>();
         private Dictionary<int, Vector3> _current = new Dictionary<int, Vector3>();
@@ -60,7 +61,7 @@ namespace Friendslop.Features.FactoryPrototype
                 _sim.BuildingAdded -= OnBuildingAdded;
                 _sim.BuildingRemoved -= OnBuildingRemoved;
                 _sim.StateReset -= Rebuild;
-                _sim.Ticked -= CaptureItems;
+                _sim.Ticked -= OnTicked;
             }
 
             _sim = sim;
@@ -71,7 +72,7 @@ namespace Friendslop.Features.FactoryPrototype
                 _sim.BuildingAdded += OnBuildingAdded;
                 _sim.BuildingRemoved += OnBuildingRemoved;
                 _sim.StateReset += Rebuild;
-                _sim.Ticked += CaptureItems;
+                _sim.Ticked += OnTicked;
             }
         }
 
@@ -80,6 +81,7 @@ namespace Friendslop.Features.FactoryPrototype
             foreach (GameObject view in _buildingViews.Values)
                 Destroy(view);
             _buildingViews.Clear();
+            _lamps.Clear();
             _previous.Clear();
             _current.Clear();
             _currentItems.Clear();
@@ -95,7 +97,16 @@ namespace Friendslop.Features.FactoryPrototype
 
         private void OnBuildingAdded(Building building)
         {
-            _buildingViews[building.Id] = BuildingVisuals.Create(building.Def, building.Origin, building.Rotation, transform, false);
+            GameObject view = BuildingVisuals.Create(building.Def, building.Origin, building.Rotation, transform, false);
+            _buildingViews[building.Id] = view;
+
+            Transform lamp = view.transform.Find(BuildingVisuals.LampName);
+            if (lamp != null)
+            {
+                var entry = new Lamp { Renderer = lamp.GetComponent<Renderer>(), Status = building.Status };
+                BuildingVisuals.SetStatusColor(entry.Renderer, FactoryPalette.Status(entry.Status));
+                _lamps[building.Id] = entry;
+            }
         }
 
         private void OnBuildingRemoved(Building building)
@@ -104,6 +115,30 @@ namespace Friendslop.Features.FactoryPrototype
             {
                 Destroy(view);
                 _buildingViews.Remove(building.Id);
+            }
+            _lamps.Remove(building.Id);
+        }
+
+        private void OnTicked()
+        {
+            CaptureItems();
+            UpdateLamps();
+        }
+
+        /// <summary>Recolors only lamps whose status changed this tick.</summary>
+        private void UpdateLamps()
+        {
+            foreach (Building building in _sim.Buildings)
+            {
+                if (!_lamps.TryGetValue(building.Id, out Lamp lamp))
+                    continue;
+
+                BuildingStatus status = building.Status;
+                if (status == lamp.Status)
+                    continue;
+
+                lamp.Status = status;
+                BuildingVisuals.SetStatusColor(lamp.Renderer, FactoryPalette.Status(status));
             }
         }
 
@@ -170,6 +205,12 @@ namespace Friendslop.Features.FactoryPrototype
             batch = new ItemBatch(material);
             _batches.Add(type, batch);
             return batch;
+        }
+
+        private sealed class Lamp
+        {
+            public Renderer Renderer;
+            public BuildingStatus Status;
         }
 
         private sealed class ItemBatch

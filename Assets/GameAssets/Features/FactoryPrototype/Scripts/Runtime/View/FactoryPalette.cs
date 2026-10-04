@@ -15,6 +15,17 @@ namespace Friendslop.Features.FactoryPrototype
         public static readonly Color OutputPort = new Color(1f, 0.55f, 0.1f);
         public static readonly Color Arrow = new Color(0.95f, 0.95f, 0.95f);
 
+        public static Color Status(BuildingStatus status)
+        {
+            switch (status)
+            {
+                case BuildingStatus.Working: return new Color(0.2f, 1f, 0.3f);
+                case BuildingStatus.Waiting: return new Color(1f, 0.8f, 0.1f);
+                case BuildingStatus.Blocked: return new Color(1f, 0.15f, 0.1f);
+                default: return new Color(0.4f, 0.4f, 0.4f);
+            }
+        }
+
         public static Color Item(ushort itemId)
         {
             switch (itemId)
