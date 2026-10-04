@@ -87,12 +87,24 @@ namespace Friendslop.Features.FactoryPrototype
             BuildTool tool = BuildTool.Local;
             if (tool != null)
             {
-                text.AppendLine($"<b>Build</b> [{tool.SelectedSlot + 1}] {tool.SelectedDef.Name}   rot {tool.Rotation} ({Footprint.Forward(tool.Rotation)})");
+                if (tool.Mode == BuildMode.Dismantle)
+                    text.AppendLine("<b>Mode</b> <color=red>DISMANTLE</color>");
+                else
+                    text.AppendLine($"<b>Mode</b> build [{tool.SelectedSlot + 1}] {tool.SelectedDef.Name}   rot {tool.Rotation} ({Footprint.Forward(tool.Rotation)})");
+
+                if (tool.BeltRunLength > 0)
+                {
+                    string state = tool.BeltRunValid ? "<color=lime>ok</color>" : "<color=red>blocked</color>";
+                    text.AppendLine($"<b>Belt run</b> {tool.BeltRunLength} tiles {state}");
+                }
+                if (tool.PendingCount > 0)
+                    text.AppendLine($"<b>Pending</b> {tool.PendingCount}");
                 text.AppendLine($"<b>Target</b> {(tool.TargetBuilding != null ? tool.TargetBuilding.Describe() : "-")}");
             }
 
             text.AppendLine();
-            text.AppendLine("1-6 slot   R rotate   LMB place   RMB remove   Tab cursor");
+            text.AppendLine("1-6 select   LMB place (belts: start, end)   RMB cancel run   R rotate / flip corner");
+            text.AppendLine("F dismantle mode (hold LMB)   MMB sample   Tab cursor");
             text.Append("F5 demo line (server)   F8 corrupt (client)   F9 join   F10 leave");
             return text.ToString();
         }

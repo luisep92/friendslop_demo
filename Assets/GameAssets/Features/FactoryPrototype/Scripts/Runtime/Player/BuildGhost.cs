@@ -4,32 +4,31 @@ using UnityEngine;
 namespace Friendslop.Features.FactoryPrototype
 {
     /// <summary>
-    /// Collider-less placement preview, tinted green or red by placement validity.
+    /// One transparent, collider-less preview of a building. Recreated only when the def changes.
     /// </summary>
     public sealed class BuildGhost
     {
         private GameObject _root;
         private BuildingDef _def;
-        private bool? _valid;
+        private Color? _color;
 
-        public void Show(BuildingDef def, Int3 origin, int rotation, bool valid)
+        public void Show(BuildingDef def, Int3 origin, int rotation, Color color)
         {
             if (_def != def || _root == null)
             {
                 Destroy();
                 _def = def;
-                _root = BuildingVisuals.Create(def, origin, rotation, null, false);
-                _root.name = "BuildGhost";
+                _root = BuildingVisuals.Create(def, origin, rotation, null, true);
+                _root.name = $"Ghost {def.Name}";
                 _root.transform.localScale = Vector3.one * 1.02f;
-                _valid = null;
             }
 
             _root.SetActive(true);
             BuildingVisuals.Place(_root.transform, origin, rotation);
-            if (_valid != valid)
+            if (_color != color)
             {
-                BuildingVisuals.Tint(_root, valid ? FactoryPalette.GhostValid : FactoryPalette.GhostInvalid);
-                _valid = valid;
+                BuildingVisuals.Tint(_root, color);
+                _color = color;
             }
         }
 
@@ -45,6 +44,7 @@ namespace Friendslop.Features.FactoryPrototype
                 Object.Destroy(_root);
             _root = null;
             _def = null;
+            _color = null;
         }
     }
 }

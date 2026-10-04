@@ -15,17 +15,31 @@ namespace Friendslop.Features.FactoryPrototype
 
         public FactoryInput()
         {
-            Place = Create("Place", "<Mouse>/leftButton");
-            Remove = Create("Remove", "<Mouse>/rightButton");
+            Primary = Create("Primary", "<Mouse>/leftButton");
+            Secondary = Create("Secondary", "<Mouse>/rightButton");
+            Sample = Create("Sample", "<Mouse>/middleButton");
             Rotate = Create("Rotate", "<Keyboard>/r");
+            Dismantle = Create("Dismantle", "<Keyboard>/f");
             ToggleCursor = Create("ToggleCursor", "<Keyboard>/tab");
             for (int i = 0; i < SlotCount; i++)
                 _slots[i] = Create($"Slot{i + 1}", $"<Keyboard>/{i + 1}");
         }
 
-        public InputAction Place { get; }
-        public InputAction Remove { get; }
+        /// <summary>Place / confirm / dismantle (hold).</summary>
+        public InputAction Primary { get; }
+
+        /// <summary>Cancel the current belt run.</summary>
+        public InputAction Secondary { get; }
+
+        /// <summary>Copy type and rotation of the targeted building.</summary>
+        public InputAction Sample { get; }
+
+        /// <summary>Rotate, or flip the corner of a belt run.</summary>
         public InputAction Rotate { get; }
+
+        /// <summary>Toggle dismantle mode.</summary>
+        public InputAction Dismantle { get; }
+
         public InputAction ToggleCursor { get; }
 
         /// <summary>Index of the slot key pressed this frame, or -1.</summary>
@@ -41,9 +55,11 @@ namespace Friendslop.Features.FactoryPrototype
 
         public void Dispose()
         {
-            Place.Dispose();
-            Remove.Dispose();
+            Primary.Dispose();
+            Secondary.Dispose();
+            Sample.Dispose();
             Rotate.Dispose();
+            Dismantle.Dispose();
             ToggleCursor.Dispose();
             foreach (InputAction slot in _slots)
                 slot.Dispose();
