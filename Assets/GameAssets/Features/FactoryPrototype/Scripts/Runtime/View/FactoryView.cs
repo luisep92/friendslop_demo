@@ -95,7 +95,7 @@ namespace Friendslop.Features.FactoryPrototype
 
         private void OnBuildingAdded(Building building)
         {
-            _buildingViews[building.Id] = BuildingVisuals.Create(building.Def, building.Origin, building.Rotation, transform, true);
+            _buildingViews[building.Id] = BuildingVisuals.Create(building.Def, building.Origin, building.Rotation, transform, false);
         }
 
         private void OnBuildingRemoved(Building building)

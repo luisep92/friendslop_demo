@@ -6,8 +6,10 @@ namespace Friendslop.Features.FactoryPrototype
     /// <summary>Greybox colors. Replace with real assets later.</summary>
     public static class FactoryPalette
     {
-        public static readonly Color GhostValid = new Color(0.3f, 0.9f, 0.4f);
-        public static readonly Color GhostInvalid = new Color(0.95f, 0.25f, 0.2f);
+        public static readonly Color GhostValid = new Color(0.3f, 0.9f, 0.4f, 0.45f);
+        public static readonly Color GhostInvalid = new Color(0.95f, 0.25f, 0.2f, 0.45f);
+        public static readonly Color GhostDismantle = new Color(1f, 0.15f, 0.1f, 0.55f);
+        public static readonly Color GhostPending = new Color(0.35f, 0.65f, 1f, 0.4f);
         public static readonly Color InputPort = new Color(0.2f, 0.8f, 0.3f);
         public static readonly Color OutputPort = new Color(1f, 0.55f, 0.1f);
         public static readonly Color Arrow = new Color(0.95f, 0.95f, 0.95f);
