@@ -8,11 +8,15 @@ namespace Friendslop.Features.FactoryPrototype
 {
     /// <summary>
     /// IMGUI debug panel and debug keys. Not networked, so F9 works while disconnected.
-    /// F5 demo layout (server), F8 corrupt replica (client), F9 join as client, F10 leave (client).
+    /// F5 demo layout, F6 save, F7 load (server); F8 corrupt replica (client); F9 join as client, F10 leave (client).
     /// </summary>
     public sealed class FactoryDebugOverlay : MonoBehaviour
     {
+        private const float MessageSeconds = 5f;
+
         private InputAction _demo;
+        private InputAction _save;
+        private InputAction _load;
         private InputAction _corrupt;
         private InputAction _join;
         private InputAction _leave;
@@ -21,6 +25,8 @@ namespace Friendslop.Features.FactoryPrototype
         private void OnEnable()
         {
             _demo = Create("DebugDemo", "<Keyboard>/f5");
+            _save = Create("DebugSave", "<Keyboard>/f6");
+            _load = Create("DebugLoad", "<Keyboard>/f7");
             _corrupt = Create("DebugCorrupt", "<Keyboard>/f8");
             _join = Create("DebugJoin", "<Keyboard>/f9");
             _leave = Create("DebugLeave", "<Keyboard>/f10");
@@ -29,6 +35,8 @@ namespace Friendslop.Features.FactoryPrototype
         private void OnDisable()
         {
             _demo.Dispose();
+            _save.Dispose();
+            _load.Dispose();
             _corrupt.Dispose();
             _join.Dispose();
             _leave.Dispose();
@@ -42,6 +50,12 @@ namespace Friendslop.Features.FactoryPrototype
 
             if (_demo.WasPressedThisFrame() && network != null)
                 network.RequestDemoLayout();
+
+            if (_save.WasPressedThisFrame() && network != null)
+                network.SaveToDisk();
+
+            if (_load.WasPressedThisFrame() && network != null)
+                network.LoadFromDisk();
 
             if (_corrupt.WasPressedThisFrame() && network != null)
                 network.DebugCorruptReplica();
@@ -74,6 +88,8 @@ namespace Friendslop.Features.FactoryPrototype
             text.AppendLine($"<b>Role</b> {Role()}");
             if (sim != null)
                 text.AppendLine($"<b>Tick</b> {sim.Tick}   <b>Coins</b> {sim.Coins}   <b>Buildings</b> {sim.Buildings.Count}");
+            if (network != null && network.PersistenceMessage != null && Time.unscaledTime - network.PersistenceMessageTime < MessageSeconds)
+                text.AppendLine($"<b>Save</b> {network.PersistenceMessage}");
 
             LockstepClient replica = network != null ? network.Replica : null;
             if (replica != null)
@@ -107,8 +123,8 @@ namespace Friendslop.Features.FactoryPrototype
 
             text.AppendLine();
             text.AppendLine("1-6 select   LMB place (belts: start, end)   RMB cancel   R rotate / flip corner / turn end");
-            text.AppendLine("F dismantle: click mark, Ctrl sweep, hold LMB dismantle, RMB clear   MMB sample   Tab cursor");
-            text.Append("F5 demo line (server)   F8 corrupt (client)   F9 join   F10 leave");
+            text.AppendLine("F dismantle: click mark, Ctrl sweep, hold LMB dismantle, RMB clear   MMB sample   E inspect   Tab cursor");
+            text.Append("Server: F5 demo line, F6 save, F7 load   Client: F8 corrupt, F9 join, F10 leave");
             return text.ToString();
         }
 

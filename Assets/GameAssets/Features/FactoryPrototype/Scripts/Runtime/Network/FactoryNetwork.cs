@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using FishNet.Connection;
 using FishNet.Object;
 using Friendslop.Features.FactoryPrototype.Simulation;
@@ -27,6 +28,12 @@ namespace Friendslop.Features.FactoryPrototype
         private FixedStepClock _serverClock;
 
         public static FactoryNetwork Instance { get; private set; }
+
+        public static string SavePath => Path.Combine(Application.persistentDataPath, "factory_prototype.sav");
+
+        /// <summary>Last save/load result, for the overlay.</summary>
+        public string PersistenceMessage { get; private set; }
+        public float PersistenceMessageTime { get; private set; }
 
         /// <summary>Sim to present on this peer. Null until the server started or the first snapshot arrived.</summary>
         public FactorySim ActiveSim
@@ -116,6 +123,55 @@ namespace Friendslop.Features.FactoryPrototype
                 _server.Enqueue(command);
         }
 
+        /// <summary>Server only. Writes the canonical sim to SavePath.</summary>
+        public void SaveToDisk()
+        {
+            if (_server == null)
+                return;
+
+            try
+            {
+                File.WriteAllBytes(SavePath, SaveFile.Write(_server.Sim));
+                Report($"Saved tick {_server.Sim.Tick} to {SavePath}", false);
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+            {
+                Report($"Save failed: {exception.Message}", true);
+            }
+        }
+
+        /// <summary>Server only. Replaces the sim with the save and pushes a fresh snapshot to every client.</summary>
+        public void LoadFromDisk()
+        {
+            if (_server == null)
+                return;
+
+            byte[] data;
+            try
+            {
+                data = File.ReadAllBytes(SavePath);
+            }
+            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+            {
+                Report($"Load failed: {exception.Message}", true);
+                return;
+            }
+
+            if (!_server.TryLoad(data, out string error))
+            {
+                Report($"Load failed: {error}", true);
+                return;
+            }
+
+            // Ticks may have gone backwards: replicas cannot continue from their current state.
+            foreach (NetworkConnection connection in ServerManager.Clients.Values)
+            {
+                if (!connection.IsLocalClient)
+                    SendSnapshot(connection);
+            }
+            Report($"Loaded tick {_server.Sim.Tick}", false);
+        }
+
         /// <summary>Client only. Breaks the replica to exercise mismatch detection and resync.</summary>
         public void DebugCorruptReplica()
         {
@@ -147,6 +203,16 @@ namespace Friendslop.Features.FactoryPrototype
             _lastSnapshotSent[connection.ClientId] = Time.unscaledTime;
             byte[] snapshot = _server.CreateSnapshot();
             TargetSnapshot(connection, new ArraySegment<byte>(snapshot));
+        }
+
+        private void Report(string message, bool isError)
+        {
+            PersistenceMessage = message;
+            PersistenceMessageTime = Time.unscaledTime;
+            if (isError)
+                Debug.LogError($"[FactoryNetwork] {message}");
+            else
+                Debug.Log($"[FactoryNetwork] {message}");
         }
 
         private void ClearInstance()
