@@ -5,6 +5,13 @@
 
 This project aims to collect some experience in the friendslop game development before making the real game, so the result may be a working demo with some experimental features.
 
+## Context files
+- `NEXT_STEPS.md`: session handoff (state, done, next, known issues). Read at session start. Update at session end, 5 minutes max.
+- `ARCHITECTURE.md`: modules, data flow, netcode. Update when architecture changes.
+- `DECISIONS.md`: resolved and open decisions with rationale. Update when deciding; do not re-discuss resolved ones without new facts.
+- `.claude/skills/unity-verify/`: how to compile, test and play-test through UnityMCP.
+- Keep them lean and factual. Remove or flag stale content.
+
 ## Stack
 - Unity 6000.3.25f1, URP.
 - Networking: FishNet 4.7.3, installed via UPM git URL pinned to tag (`Packages/manifest.json`). Upgrade by changing the tag.
