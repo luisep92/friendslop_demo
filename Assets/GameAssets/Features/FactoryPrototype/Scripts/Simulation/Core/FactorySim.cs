@@ -11,6 +11,9 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
     {
         private const byte SnapshotVersion = 1;
 
+        // One building per cell at most.
+        private const int MaxBuildings = (SimConstants.GridMax - SimConstants.GridMin + 1) * (SimConstants.GridMax - SimConstants.GridMin + 1);
+
         private readonly List<Building> _buildings = new List<Building>();
 
         // Lookup only. Never iterated: iteration order is not deterministic.
@@ -159,7 +162,7 @@ namespace Friendslop.Features.FactoryPrototype.Simulation
             int nextBuildingId = reader.ReadInt();
             int nextItemId = reader.ReadInt();
             int count = reader.ReadInt();
-            if (count < 0)
+            if (count < 0 || count > MaxBuildings)
                 throw new FormatException($"Invalid building count {count}.");
 
             var loaded = new List<Building>(count);
