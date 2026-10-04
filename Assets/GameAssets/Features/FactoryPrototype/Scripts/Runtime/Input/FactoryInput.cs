@@ -21,6 +21,7 @@ namespace Friendslop.Features.FactoryPrototype
             Rotate = Create("Rotate", "<Keyboard>/r");
             Dismantle = Create("Dismantle", "<Keyboard>/f");
             Modifier = Create("Modifier", "<Keyboard>/ctrl");
+            Interact = Create("Interact", "<Keyboard>/e");
             ToggleCursor = Create("ToggleCursor", "<Keyboard>/tab");
             for (int i = 0; i < SlotCount; i++)
                 _slots[i] = Create($"Slot{i + 1}", $"<Keyboard>/{i + 1}");
@@ -34,6 +35,9 @@ namespace Friendslop.Features.FactoryPrototype
 
         /// <summary>Dismantle: held, adds whatever is aimed at to the selection.</summary>
         public InputAction Modifier { get; }
+
+        /// <summary>Open / close the inspector of the aimed building.</summary>
+        public InputAction Interact { get; }
 
         /// <summary>Copy type and rotation of the targeted building.</summary>
         public InputAction Sample { get; }
@@ -65,6 +69,7 @@ namespace Friendslop.Features.FactoryPrototype
             Rotate.Dispose();
             Dismantle.Dispose();
             Modifier.Dispose();
+            Interact.Dispose();
             ToggleCursor.Dispose();
             foreach (InputAction slot in _slots)
                 slot.Dispose();

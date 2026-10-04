@@ -19,7 +19,7 @@ namespace Friendslop.Features.FactoryPrototype
     ///   Other buildings: R rotates.
     /// - Dismantle (F), Satisfactory style: click marks/unmarks, Ctrl sweeps the aim to mark,
     ///   hold LMB to dismantle the marked buildings (or the aimed one), RMB clears the marks.
-    /// - MMB samples type and rotation of the aimed building.
+    /// - MMB samples type and rotation of the aimed building. E opens / closes its inspector.
     /// Requests go through FactoryNetwork; the server validates them with the same Footprint rules.
     /// </summary>
     [RequireComponent(typeof(FirstPersonController))]
@@ -70,6 +70,12 @@ namespace Friendslop.Features.FactoryPrototype
 
         /// <summary>0-1 while LMB is held in dismantle mode.</summary>
         public float DismantleProgress { get; private set; }
+
+        /// <summary>Building shown in the inspector panel (E), 0 if closed.</summary>
+        public int InspectedBuildingId { get; private set; }
+
+        /// <summary>Why the current preview cannot be placed. Null when it can (or nothing is previewed).</summary>
+        public string PlacementMessage { get; private set; }
 
         public override void OnStartClient()
         {
@@ -129,6 +135,8 @@ namespace Friendslop.Features.FactoryPrototype
             UpdateTarget(sim);
             if (_input.Sample.WasPressedThisFrame())
                 SampleTarget();
+            UpdateInspector(sim);
+            PlacementMessage = null;
 
             int ghostCount;
             if (Mode == BuildMode.Dismantle)
@@ -180,6 +188,33 @@ namespace Friendslop.Features.FactoryPrototype
             Int3 inside = GridSpace.WorldToCell(hit.point - hit.normal * SurfaceEpsilon);
             // Single level for now: buildings live at y = 0, whatever face was hit.
             TargetBuilding = sim.GetBuildingAt(new Int3(inside.X, 0, inside.Z));
+        }
+
+        /// <summary>E toggles the inspector on the aimed building. Closes when the building disappears.</summary>
+        private void UpdateInspector(FactorySim sim)
+        {
+            if (InspectedBuildingId != 0 && sim.GetBuilding(InspectedBuildingId) == null)
+                InspectedBuildingId = 0;
+
+            if (!_input.Interact.WasPressedThisFrame())
+                return;
+
+            if (InspectedBuildingId != 0 && (TargetBuilding == null || TargetBuilding.Id == InspectedBuildingId))
+                InspectedBuildingId = 0;
+            else if (TargetBuilding != null)
+                InspectedBuildingId = TargetBuilding.Id;
+        }
+
+        private static string Describe(PlacementResult result)
+        {
+            switch (result)
+            {
+                case PlacementResult.Ok: return null;
+                case PlacementResult.Occupied: return "Occupied";
+                case PlacementResult.OutOfBounds: return "Outside the build area";
+                case PlacementResult.WrongLevel: return "Ground level only";
+                default: return "Unknown building";
+            }
         }
 
         private void SampleTarget()
@@ -283,11 +318,20 @@ namespace Friendslop.Features.FactoryPrototype
             if (!_hasTarget)
                 return 0;
 
-            bool valid = sim.CanPlace(SelectedDef.Id, _placeCell, Rotation);
+            bool valid = Check(sim, SelectedDef.Id, _placeCell, Rotation);
             _ghosts.Show(0, SelectedDef, _placeCell, Rotation, valid ? FactoryPalette.GhostValid : FactoryPalette.GhostInvalid);
             if (_input.Primary.WasPressedThisFrame() && valid)
                 Request(network, SelectedDef, _placeCell, Rotation);
             return 1;
+        }
+
+        /// <summary>CanPlace that also records the first rejection reason of the frame.</summary>
+        private bool Check(FactorySim sim, ushort defId, Int3 origin, int rotation)
+        {
+            PlacementResult result = sim.CheckPlacement(defId, origin, rotation);
+            if (result != PlacementResult.Ok && PlacementMessage == null)
+                PlacementMessage = Describe(result);
+            return result == PlacementResult.Ok;
         }
 
         private int UpdateBeltTool(FactoryNetwork network, FactorySim sim)
@@ -305,7 +349,7 @@ namespace Friendslop.Features.FactoryPrototype
 
                 bool hasFeeder = BeltPlanner.TryFindFeeder(sim, _placeCell, out Dir feederFlow);
                 int rotation = hasFeeder ? (int)feederFlow : Rotation;
-                bool valid = sim.CanPlace(belt.Id, _placeCell, rotation);
+                bool valid = Check(sim, belt.Id, _placeCell, rotation);
                 _ghosts.Show(0, belt, _placeCell, rotation, valid ? FactoryPalette.GhostValid : FactoryPalette.GhostInvalid);
 
                 if (_input.Primary.WasPressedThisFrame() && valid)
@@ -343,10 +387,12 @@ namespace Friendslop.Features.FactoryPrototype
             BeltPlanner.PlanRun(sim, _runStart, end, _runStartFlow, _endOverride, _flipCorner, Rotation, _beltPlan);
 
             BeltRunValid = _beltPlan.Count <= MaxBeltRun;
+            if (!BeltRunValid)
+                PlacementMessage = $"Run too long (max {MaxBeltRun})";
             for (int i = 0; i < _beltPlan.Count; i++)
             {
                 BeltTile tile = _beltPlan[i];
-                bool valid = sim.CanPlace(belt.Id, tile.Cell, tile.Rotation);
+                bool valid = Check(sim, belt.Id, tile.Cell, tile.Rotation);
                 BeltRunValid &= valid;
                 _ghosts.Show(i, belt, tile.Cell, tile.Rotation, valid ? FactoryPalette.GhostValid : FactoryPalette.GhostInvalid);
             }
@@ -377,6 +423,7 @@ namespace Friendslop.Features.FactoryPrototype
         private void ClearFrame()
         {
             TargetBuilding = null;
+            PlacementMessage = null;
             _ghosts.HideFrom(0);
         }
     }

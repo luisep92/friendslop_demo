@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 5645056583486102703}
   - component: {fileID: 1954923291041915674}
   - component: {fileID: 5889500553844938032}
+  - component: {fileID: 4632114762385446043}
   m_Layer: 0
   m_Name: FactoryPresentation
   m_TagString: Untagged
@@ -72,3 +73,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 84b93463c95820a409c83096bc543d90, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Friendslop.Features.FactoryPrototype::Friendslop.Features.FactoryPrototype.FactoryDebugOverlay
+--- !u!114 &4632114762385446043
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2542744242727776657}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c6d336bde1350a346902504fbcb799b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Friendslop.Features.FactoryPrototype::Friendslop.Features.FactoryPrototype.BuildHud
